@@ -1,0 +1,244 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#10111a">
+  <title>VIKING AI | هوش مصنوعی</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Tahoma, Arial, sans-serif;
+      background: #10111a;
+      color: #f4f4f8;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 18px 22px;
+      border-bottom: 1px solid #292a38;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #151621;
+    }
+    .logo {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #8b5cf6, #4338ca);
+      font-size: 25px;
+    }
+    header h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+    header p { margin: 5px 0 0; color: #aaaabd; font-size: 12px; }
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 16px;
+      width: 100%;
+      max-width: 850px;
+      margin: 0 auto;
+    }
+    .welcome { text-align: center; padding: 12vh 10px 25px; }
+    .welcome .big { font-size: 48px; }
+    .welcome h2 { font-size: 27px; margin-bottom: 10px; }
+    .welcome p { color: #aaaabd; line-height: 1.9; }
+    .message {
+      margin: 18px 0;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .message.user { flex-direction: row-reverse; }
+    .avatar {
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: #292a3b;
+      font-size: 16px;
+    }
+    .user .avatar { background: #5141a8; }
+    .bubble {
+      max-width: 82%;
+      padding: 13px 16px;
+      border-radius: 15px;
+      background: #1d1e2b;
+      line-height: 1.9;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .user .bubble { background: #343052; }
+    .error { color: #ff9999; }
+    .composer-wrap {
+      width: 100%;
+      max-width: 850px;
+      padding: 12px 16px 20px;
+      margin: 0 auto;
+    }
+    .composer {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      padding: 10px;
+      border: 1px solid #38394c;
+      background: #1b1c29;
+      border-radius: 18px;
+    }
+    textarea {
+      flex: 1;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: white;
+      font: inherit;
+      padding: 10px 5px;
+      min-height: 42px;
+      max-height: 150px;
+    }
+    textarea::placeholder { color: #9293a8; }
+    button {
+      border: 0;
+      border-radius: 12px;
+      background: #7655ed;
+      color: white;
+      cursor: pointer;
+      font: inherit;
+      padding: 12px 17px;
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .hint { text-align: center; color: #85869b; font-size: 11px; margin-top: 10px; }
+    @media (max-width: 500px) {
+      header { padding: 13px 15px; }
+      .welcome { padding-top: 8vh; }
+      .welcome h2 { font-size: 23px; }
+      .bubble { max-width: 88%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">⚔️</div>
+    <div>
+      <h1>VIKING AI</h1>
+      <p>دستیار هوش مصنوعی تو</p>
+    </div>
+  </header>
+
+  <main id="chat" aria-live="polite">
+    <div class="welcome" id="welcome">
+      <div class="big">⚔️</div>
+      <h2>به وایکینگ خوش آمدی!</h2>
+      <p>هر سؤالی داری بپرس؛ از همین‌جا شروع کن.</p>
+    </div>
+  </main>
+
+  <div class="composer-wrap">
+    <form class="composer" id="form">
+      <textarea id="input" rows="1" maxlength="4000"
+        placeholder="پیامت را بنویس..." aria-label="پیام تو"></textarea>
+      <button id="send" type="submit">ارسال ↑</button>
+    </form>
+    <div class="hint">پاسخ‌ها توسط هوش مصنوعی تولید می‌شوند و ممکن است اشتباه باشند.</div>
+  </div>
+
+  <script>
+    const API_URL = "https://viking-ai.mmd321829.workers.dev";
+
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const send = document.getElementById("send");
+    const welcome = document.getElementById("welcome");
+
+    const messages = [];
+    let busy = false;
+
+    function addMessage(role, text, isError = false) {
+      const row = document.createElement("div");
+      row.className = "message " + (role === "user" ? "user" : "assistant");
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = role === "user" ? "👤" : "⚔️";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble" + (isError ? " error" : "");
+      bubble.textContent = text;
+
+      row.append(avatar, bubble);
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+      return bubble;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const text = input.value.trim();
+      if (!text || busy) return;
+
+      welcome.style.display = "none";
+      addMessage("user", text);
+      messages.push({ role: "user", content: text });
+
+      input.value = "";
+      input.style.height = "42px";
+      busy = true;
+      send.disabled = true;
+      send.textContent = "...";
+
+      const loading = addMessage("assistant", "وایکینگ در حال فکر کردن است...");
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.answer) {
+          throw new Error(data.error || "دریافت پاسخ ناموفق بود.");
+        }
+
+        loading.textContent = data.answer;
+        messages.push({ role: "assistant", content: data.answer });
+      } catch (error) {
+        loading.textContent =
+          "ارتباط با هوش مصنوعی برقرار نشد. اتصال اینترنت و تنظیمات Worker را بررسی کن.";
+        loading.classList.add("error");
+        messages.pop();
+        console.error(error);
+      } finally {
+        busy = false;
+        send.disabled = false;
+        send.textContent = "ارسال ↑";
+        input.focus();
+        chat.scrollTop = chat.scrollHeight;
+      }
+    });
+
+    input.addEventListener("input", () => {
+      input.style.height = "42px";
+      input.style.height = Math.min(input.scrollHeight, 150) + "px";
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+  </script>
+</body>
+</html>
